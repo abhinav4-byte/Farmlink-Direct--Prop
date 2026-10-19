@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import "./App.css";
 import {
   uploadImage,
   createProduct,
@@ -6,25 +7,23 @@ import {
 } from "./services/products.js";
 
 function App() {
-  const [name, setName] = useState("");
-  const [quantity, setQuantity] = useState("50");
-  const [price, setPrice] = useState("40");
+  const [productName, setProductName] = useState("");
+  const [quantity, setQuantity] = useState("");
+  const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
-  const [file, setFile] = useState(null);
-
-  const [products, setProducts] = useState([]);
-  const [status, setStatus] = useState("");
+  const [image, setImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState("");
+  const [listings, setListings] = useState([]);
+  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(true);
 
   async function loadProducts() {
-    setLoadingProducts(true);
-
     try {
-      const data = await getProducts();
-      setProducts(data);
+      const products = await getProducts();
+      setListings(products);
     } catch (error) {
-      setStatus(`Could not load products: ${error.message}`);
+      setMessage(error.message);
     } finally {
       setLoadingProducts(false);
     }
@@ -36,178 +35,177 @@ function App() {
 
   async function handleSubmit(event) {
     event.preventDefault();
-    setStatus("");
+    setMessage("");
+
+    if (!productName.trim() || !quantity || !price || !image) {
+      setMessage("Please complete all required fields and select a photo.");
+      return;
+    }
+
+    if (Number(quantity) <= 0 || Number(price) <= 0) {
+      setMessage("Quantity and price must be greater than zero.");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      setStatus("Uploading image...");
-      const imageUrl = await uploadImage(file);
+      // 1. Upload the image to Supabase Storage.
+      const imageUrl = await uploadImage(image);
 
-      setStatus("Saving product...");
+      // 2. Save the product and image URL to PostgreSQL.
       await createProduct({
-        name,
+        name: productName,
         quantity,
         price,
         description,
         image_url: imageUrl,
       });
 
-      setStatus("Product created successfully!");
-
-      setName("");
-      setQuantity("50");
-      setPrice("40");
+      // 3. Reset the form.
+      setProductName("");
+      setQuantity("");
+      setPrice("");
       setDescription("");
-      setFile(null);
+      setImage(null);
+      setImagePreview("");
 
-      const fileInput = document.getElementById("product-image");
-      if (fileInput) {
-  	fileInput.value = "";
-      }
+      const fileInput = document.getElementById("productImage");
+      if (fileInput) fileInput.value = "";
 
+      setMessage("Product listing saved successfully!");
+
+      // 4. Retrieve the saved listings.
       await loadProducts();
     } catch (error) {
-      setStatus(`Operation failed: ${error.message}`);
+      setMessage(error.message || "Something went wrong.");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <main
-      style={{
-        maxWidth: "850px",
-        margin: "40px auto",
-        padding: "0 20px",
-        fontFamily: "Arial, sans-serif",
-      }}
-    >
-      <h1>FarmLink Direct</h1>
-      <p>Farmer Product Listing Practice</p>
-
-      <h2>Create a product</h2>
+    <main className="container">
+      <h1>FarmLink Farmer Portal</h1>
+      <p>Manage your farm products in one place.</p>
 
       <form onSubmit={handleSubmit}>
-        <p>
-          <label>
-            Product name
-            <br />
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-          </label>
-        </p>
+        <div className="form-row">
+          <label htmlFor="productName">Product name:</label>
+          <input
+            id="productName"
+            type="text"
+            placeholder="e.g. Tomatoes"
+            value={productName}
+            onChange={(e) => setProductName(e.target.value)}
+            required
+          />
+        </div>
 
-        <p>
-          <label>
-            Quantity (kg)
-            <br />
-            <input
-              type="number"
-              min="0.01"
-              step="any"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              required
-            />
-          </label>
-        </p>
+        <div className="form-row">
+          <label htmlFor="quantity">Quantity (kg):</label>
+          <input
+            id="quantity"
+            type="number"
+            min="0.01"
+            step="any"
+            placeholder="e.g. 10"
+            value={quantity}
+            onChange={(e) => setQuantity(e.target.value)}
+            required
+          />
+        </div>
 
-        <p>
-          <label>
-            Price per kg (₹)
-            <br />
-            <input
-              type="number"
-              min="0.01"
-              step="any"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              required
-            />
-          </label>
-        </p>
+        <div className="form-row">
+          <label htmlFor="price">Price per kg (₹):</label>
+          <input
+            id="price"
+            type="number"
+            min="0.01"
+            step="any"
+            placeholder="e.g. 40"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            required
+          />
+        </div>
 
-        <p>
-          <label>
-            Description
-            <br />
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-          </label>
-        </p>
+        <div className="form-row">
+          <label htmlFor="description">Description:</label>
+          <textarea
+            id="description"
+            placeholder="Describe your product..."
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        </div>
 
-        <p>
-          <label>
-            Product image
-            <br />
-            <input
-	      id="product-image"
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              required
-            />
-          </label>
-        </p>
+        <div className="form-row">
+          <label htmlFor="productImage">Product photo:</label>
+          <input
+            id="productImage"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
 
-        <button type="submit" disabled={loading || !file}>
-          {loading ? "Saving..." : "Create product"}
-        </button>
+              if (file) {
+                setImage(file);
+                setImagePreview(URL.createObjectURL(file));
+              }
+            }}
+            required
+          />
+        </div>
+
+        {imagePreview && (
+          <div>
+            <p>Image preview:</p>
+            <img
+              src={imagePreview}
+              alt="Selected product"
+              className="image-preview"
+            />
+          </div>
+        )}
+
+        {message && <p role="status">{message}</p>}
+
+        <div className="form-actions">
+          <button type="submit" disabled={loading}>
+            {loading ? "Saving product..." : "Submit Listing"}
+          </button>
+        </div>
       </form>
 
-      <p role="status">{status}</p>
+      <section className="listings">
+        <h2>My Listings</h2>
 
-      <hr />
+        {loadingProducts ? (
+          <p>Loading products...</p>
+        ) : listings.length === 0 ? (
+          <p>No products listed yet.</p>
+        ) : (
+          <div className="product-grid">
+            {listings.map((product) => (
+              <article className="product-card" key={product.id}>
+                <img
+                  src={product.image_url}
+                  alt={product.name}
+                  className="image-preview"
+                />
 
-      <h2>My Listings</h2>
-
-      {loadingProducts && <p>Loading products...</p>}
-
-      {!loadingProducts && products.length === 0 && (
-        <p>No products listed yet.</p>
-      )}
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-          gap: "20px",
-        }}
-      >
-        {products.map((product) => (
-          <article
-            key={product.id}
-            style={{
-              border: "1px solid #ddd",
-              borderRadius: "8px",
-              padding: "15px",
-            }}
-          >
-            <img
-              src={product.image_url}
-              alt={product.name}
-              style={{
-                width: "100%",
-                height: "160px",
-                objectFit: "cover",
-              }}
-            />
-
-            <h3>{product.name}</h3>
-            <p>Quantity: {product.quantity} kg</p>
-            <p>Price: ₹{product.price}/kg</p>
-            <p>{product.description || "No description provided."}</p>
-            <small>
-              Added: {new Date(product.created_at).toLocaleString()}
-            </small>
-          </article>
-        ))}
-      </div>
+                <h3>{product.name}</h3>
+                <p>Quantity: {product.quantity} kg</p>
+                <p>Price: ₹{product.price}/kg</p>
+                <p>
+                  {product.description || "No description provided."}
+                </p>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
     </main>
   );
 }
